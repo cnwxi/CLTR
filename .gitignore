@@ -6,3 +6,4 @@ util/__pycache__/__init__.cpython-38.pyc
 util/__pycache__/box_ops.cpython-38.pyc
 util/__pycache__/misc.cpython-38.pyc
 video_demo/test3.mp4
+.gitignore

@@ -24,7 +24,7 @@ warnings.filterwarnings('ignore')
 setup_seed(args.seed)
 
 def resize_w_h(h, w):
-    max_size = 1920
+    max_size = 1280
     min_size = 384
     im_h, im_w = h, w
     rate = 1.0 * max_size / im_h
@@ -87,7 +87,7 @@ def main(args):
     '''out video'''
     width = 1024
     height = 768
-    out = cv2.VideoWriter(f"./out_{args['video_path'].split('/')[-1].split('.')[0]}.avi", fourcc, 30,
+    out = cv2.VideoWriter(f"./output/out_{args['video_path'].split('/')[-1].split('.')[0]}.avi", fourcc, 30,
                           (width * 2, height * 2))
     
     with tqdm(total=frames) as pbar:

@@ -89,8 +89,8 @@ def main(args):
     height = 768
     out = cv2.VideoWriter(f"./output/out_{args['video_path'].split('/')[-1].split('.')[0]}.avi", fourcc, 30,
                           (width * 2, height * 2))
-    
-    with tqdm(total=frames) as pbar:
+
+    with tqdm(total=frames, ncols=50) as pbar:
         while True:
             try:
                 ret, frame = cap.read()

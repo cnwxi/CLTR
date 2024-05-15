@@ -102,3 +102,11 @@ If you find this project is useful, please cite:
   year={2022}
 }
 ```
+```SHELL
+export OMP_NUM_THREADS=1
+export MKL_NUM_THREADS=1 
+python -m torch.distributed.launch --nproc_per_node=2 --master_port 8218 train_distributed.py --gpu_id '0,1' \                     
+--gray_aug --gray_p 0.1 --scale_aug --scale_type 1 --scale_p 0.3 --epochs 1500 --lr_step 1200 --lr 1e-5 \ 
+--batch_size 4 --num_patch 1 --threshold 0.35 --num_queries 700 \ 
+--dataset nwpu --crop_size 256 --pre /media/ubuntu/2.0TB/wxy/CLTR/save_file/log_file/20240427_004616/checkpoint.pth --test_per_epoch 1  --test_patch --save
+```

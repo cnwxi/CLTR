@@ -75,11 +75,7 @@ def main(args):
             args['best_pred'] = checkpoint['best_prec1']
         else:
             print("=> no checkpoint found at '{}'".format(args['pre']))
-    if os.path.exists(args['video_path']):
-        print(f"{args['video_path']}")
-    else:
-        print('video path is not exist')
-        return
+
     cap = cv2.VideoCapture(args['video_path'])
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -88,14 +84,14 @@ def main(args):
     # print(width, height)
     frames = cap.get(cv2.CAP_PROP_FRAME_COUNT)
     '''out video'''
-    # width = 1792
-    # height = 1024
-    width = 1024
-    height = 768
+    width = 1792
+    height = 1024
+    # width = 1024
+    # height = 768
     print(width, height)
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    output_path_split = args['video_path'].split('/')[:-2]
-    output_path = '/'.join(output_path_split) + f'/cltroutput/'
+    output_path_split = args['video_path'].split('/')[:-1]
+    output_path = '/'.join(output_path_split) + f'/output_{width}_{height}/'
     if not os.path.exists(output_path):
         os.makedirs(output_path)
         print('mkdir output path')
@@ -103,14 +99,12 @@ def main(args):
     output_path = output_path + output_name
     print(output_path)
     out = cv2.VideoWriter(f"{output_path}", fourcc, 30,
-                          (width , height))
+                          (width * 2, height * 2))
     history = []
     with tqdm(total=frames,ncols=50) as pbar:
         while True:
             try:
                 ret, frame = cap.read()
-                if not ret:
-                    break
                 frame = cv2.resize(frame, (width, height))
             except:
                 print("test end")
@@ -153,10 +147,9 @@ def main(args):
                     value_points, frame, width, height, crop_size, num_h,
                     num_w)
 
-                # res1 = np.hstack((ori_frame, kpoint_map))
-                # res2 = np.hstack((density_map, frame))
-                # res = np.vstack((res1, res2))
-                res =cv2.addWeighted(frame, 0.6, density_map, 0.4, 0)
+                res1 = np.hstack((ori_frame, kpoint_map))
+                res2 = np.hstack((density_map, frame))
+                res = np.vstack((res1, res2))
                 history.append(count)
                 if len(history) >= 50:
                     history.pop(0)
@@ -168,6 +161,7 @@ def main(args):
                 # cv2.imshow('result', res)
                 # if cv2.waitKey(1) & 0xFF == ord('q'):
                 #     break
+
                 pbar.update(1)
         # cv2.destroyAllWindows()
         cap.release()

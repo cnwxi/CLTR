@@ -1,11 +1,13 @@
 import cv2
+# !pip install h5py
 import h5py
 import numpy as np
 from PIL import Image
 
 def load_data(img_path, args, train=True):
-    gt_path = img_path.replace('.jpg', '.h5').replace('images', 'gt_detr_map')
-
+    # gt_path = img_path.replace('.jpg', '.h5').replace('images', 'gt_detr_map')
+    gt_path=img_path
+    # print(gt_path)
     while True:
         try:
             gt_file = h5py.File(gt_path)

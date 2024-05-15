@@ -4,13 +4,16 @@ import argparse
 
 if not os.path.exists('./npydata'):
     os.makedirs('./npydata')
-
 '''please set your dataset path'''
 
 parser = argparse.ArgumentParser(description='CLTR')
-parser.add_argument('--jhu_path', type=str, default='../datasets/jhu_crowd_v2.0',
+parser.add_argument('--jhu_path',
+                    type=str,
+                    default='../datasets/jhu_crowd_v2.0',
                     help='the data path of jhu')
-parser.add_argument('--nwpu_path', type=str, default='../datasets/NWPU_CLTR',
+parser.add_argument('--nwpu_path',
+                    type=str,
+                    default='../NWPU_CLTR_TEST',
                     help='the data path of jhu')
 
 args = parser.parse_args()
@@ -44,42 +47,44 @@ try:
     test_list.sort()
     np.save('./npydata/jhu_test.npy', test_list)
 
-    print("Generate JHU image list successfully", len(train_list), len(val_list), len(test_list))
+    print("Generate JHU image list successfully", len(train_list),
+          len(val_list), len(test_list))
 except:
     print("The JHU dataset path is wrong. Please check your path.")
 
-
 try:
-    f = open("./data/NWPU_list/train.txt", "r")
+    f = open("./data/NWPU_list/mytrain.txt", "r")
     train_list = f.readlines()
 
-    f = open("./data/NWPU_list/val.txt", "r")
+    f = open("./data/NWPU_list/myval.txt", "r")
     val_list = f.readlines()
-
     '''nwpu dataset path'''
     root = nwpu_root + '/gt_detr_map/'
-
 
     if not os.path.exists(root):
         print("The NWPU dataset path is wrong. Please check your path.")
 
     else:
         train_img_list = []
+        # cnt=0
         for i in range(len(train_list)):
             fname = train_list[i].split(' ')[0] + '.jpg'
             train_img_list.append(root + fname)
-
-
+            # cnt+=1
+            # if cnt>100:
+            #     break
+        # cnt=0         
         val_img_list = []
         for i in range(len(val_list)):
             fname = val_list[i].split(' ')[0] + '.jpg'
             val_img_list.append(root + fname)
+            # cnt+=1
+            # if cnt>10:
+            #     break
+        np.save('./npydata/testnwpu_train.npy', train_img_list)
+        np.save('./npydata/testnwpu_val.npy', val_img_list)
 
-        np.save('./npydata/nwpu_train.npy', train_img_list)
-        np.save('./npydata/nwpu_val.npy', val_img_list)
-
-
-        print("Generate NWPU image list successfully", len(train_img_list), len(val_img_list))
+        print("Generate NWPU image list successfully", len(train_img_list),
+              len(val_img_list))
 except:
     print("The NWPU dataset path is wrong. Please check your path.")
-

@@ -61,7 +61,7 @@ class listDataset(Dataset):
                 width = int(width * self.rate)
                 height = int(height * self.rate)
                 if min(width, height) > self.args['crop_size']:
-                    img = img.resize((width, height), Image.ANTIALIAS)
+                    img = img.resize((width, height), Image.LANCZOS)
                 else:
                     self.rate = 1
             else:
@@ -202,5 +202,3 @@ class listDataset(Dataset):
             distances = torch.from_numpy(distances).unsqueeze(1)
 
         return distances
-
-

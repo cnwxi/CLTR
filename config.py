@@ -2,7 +2,7 @@ import argparse
 
 parser = argparse.ArgumentParser(description='CLTR')
 
-parser.add_argument('--dataset', type=str, default='jhu',
+parser.add_argument('--dataset', type=str, default='nwpu',
                     help='choice train dataset')
 
 parser.add_argument('--save_path', type=str, default='save_file/A_ddp',
@@ -13,7 +13,7 @@ parser.add_argument('--print_freq', type=int, default=200,
                     help='print frequency')
 parser.add_argument('--start_epoch', type=int, default=0,
                     help='start epoch for training')
-parser.add_argument('--epochs', type=int, default=5000,
+parser.add_argument('--epochs', type=int, default=1500,
                     help='end epoch for training')
 parser.add_argument('--pre', type=str, default=None,
                     help='pre-trained model directory')
@@ -28,22 +28,22 @@ parser.add_argument('--seed', type=int, default=1,
                     help='random seed')
 parser.add_argument('--best_pred', type=int, default=1e5,
                     help='best pred')
-parser.add_argument('--gpu_id', type=str, default='0,1',
+parser.add_argument('--gpu_id', type=str, default='4,5',
                     help='gpu id')
-parser.add_argument('--lr', type=float, default=1e-4,
+parser.add_argument('--lr', type=float, default=1e-5,
                     help='learning rate')
 parser.add_argument('--weight_decay', type=float, default=5 * 1e-4,
                     help='weight decay')
 
-parser.add_argument('--save',  action='store_true',
+parser.add_argument('--save',  action='store_true',default=True,
                     help='save the file')
-parser.add_argument('--scale_aug', action='store_true',
+parser.add_argument('--scale_aug', action='store_true',default=True,
                     help='using the scale augmentation')
-parser.add_argument('--scale_type', type=int, default=0,
+parser.add_argument('--scale_type', type=int, default=1,
                     help='scale type')
 parser.add_argument('--scale_p', type=float, default=0.3,
                     help='probability of scaling')
-parser.add_argument('--gray_aug', action='store_true',
+parser.add_argument('--gray_aug', action='store_true',default=True,
                     help='using the gray augmentation')
 parser.add_argument('--gray_p', type=float, default=0.1,
                     help='probability of gray')
@@ -99,7 +99,7 @@ parser.add_argument('--dropout', default=0.1, type=float,
                     help="Dropout applied in the transformer")
 parser.add_argument('--nheads', default=8, type=int,
                     help="Number of attention heads inside the transformer's attentions")
-parser.add_argument('--num_queries', default=500, type=int,
+parser.add_argument('--num_queries', default=700, type=int,
                     help="Number of query slots")
 parser.add_argument('--pre_norm', action='store_true')
 
@@ -143,6 +143,8 @@ parser.add_argument('--eval', action='store_true')
 parser.add_argument('--num_workers', default=2, type=int)
 
 # distributed training parameters
+parser.add_argument('--distributed', default=True, type=bool,
+                    help='master_port')
 parser.add_argument('--world_size', default=1, type=int,
                     help='number of distributed processes')
 parser.add_argument('--dist_url', default='env:// ', help='url used to set up distributed training')

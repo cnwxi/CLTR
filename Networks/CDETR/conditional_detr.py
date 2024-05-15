@@ -57,6 +57,7 @@ class ConditionalDETR(nn.Module):
         self.class_embed.bias.data = torch.ones(num_classes) * bias_value
 
         # init point_mebed
+        # point_embed 层的最后一层在开始训练前的权重和偏置都为0。
         nn.init.constant_(self.point_embed.layers[-1].weight.data, 0)
         nn.init.constant_(self.point_embed.layers[-1].bias.data, 0)
 

@@ -32,17 +32,19 @@ class MLP(nn.Module):
             x = F.relu(layer(x)) if i < self.num_layers - 1 else layer(x)
         return x
 
-
+# 生成位置的正弦嵌入
 def gen_sineembed_for_position(pos_tensor):
     # n_query, bs, _ = pos_tensor.size()
     # sineembed_tensor = torch.zeros(n_query, bs, 256)
     scale = 2 * math.pi
     dim_t = torch.arange(128, dtype=torch.float32, device=pos_tensor.device)
     dim_t = 10000 ** (2 * (dim_t // 2) / 128)
+    # 输入张量的第三个维度是坐标的x和y，乘以scale后，再除以dim_t，将x,y坐标映射到正弦空间
     x_embed = pos_tensor[:, :, 0] * scale
     y_embed = pos_tensor[:, :, 1] * scale
     pos_x = x_embed[:, :, None] / dim_t
     pos_y = y_embed[:, :, None] / dim_t
+    # 生成正弦嵌入
     pos_x = torch.stack((pos_x[:, :, 0::2].sin(), pos_x[:, :, 1::2].cos()), dim=3).flatten(2)
     pos_y = torch.stack((pos_y[:, :, 0::2].sin(), pos_y[:, :, 1::2].cos()), dim=3).flatten(2)
     pos = torch.cat((pos_y, pos_x), dim=2)
@@ -56,25 +58,29 @@ class Transformer(nn.Module):
                  activation="relu", normalize_before=False,
                  return_intermediate_dec=False):
         super().__init__()
-
+        # 编码层
         encoder_layer = TransformerEncoderLayer(d_model, nhead, dim_feedforward,
                                                 dropout, activation, normalize_before)
+        # 编码层的归一化
         encoder_norm = nn.LayerNorm(d_model) if normalize_before else None
+        # 编码器，层数6层
         self.encoder = TransformerEncoder(encoder_layer, num_encoder_layers, encoder_norm)
-
+        # 解码层
         decoder_layer = TransformerDecoderLayer(d_model, nhead, dim_feedforward,
                                                 dropout, activation, normalize_before)
+        # 解码层的归一化
         decoder_norm = nn.LayerNorm(d_model)
+        # 解码器，层数6层
         self.decoder = TransformerDecoder(decoder_layer, num_decoder_layers, decoder_norm,
                                           return_intermediate=return_intermediate_dec,
                                           d_model=d_model)
 
         self._reset_parameters()
 
-        self.d_model = d_model
-        self.nhead = nhead
+        self.d_model = d_model 
+        self.nhead = nhead 
         self.dec_layers = num_decoder_layers
-
+    # 初始化参数，纬度大于1 使用Xavier均匀初始化
     def _reset_parameters(self):
         for p in self.parameters():
             if p.dim() > 1:
@@ -83,12 +89,14 @@ class Transformer(nn.Module):
     def forward(self, src, mask, query_embed, pos_embed):
         # flatten NxCxHxW to HWxNxC
         bs, c, h, w = src.shape
+        # 将输入张量的维度展平，调整维度顺序
         src = src.flatten(2).permute(2, 0, 1)
         pos_embed = pos_embed.flatten(2).permute(2, 0, 1)
         query_embed = query_embed.unsqueeze(1).repeat(1, bs, 1)
         mask = mask.flatten(1)
 
         tgt = torch.zeros_like(query_embed)
+        # transformer encoder
         memory = self.encoder(src, src_key_padding_mask=mask, pos=pos_embed)
         hs, references = self.decoder(tgt, memory, memory_key_padding_mask=mask,
                                       pos=pos_embed, query_pos=query_embed)

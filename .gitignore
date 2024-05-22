@@ -5,3 +5,5 @@ output
 util/__pycache__
 save_file
 kernel_meta*
+cltroutput
+fusion_result.json

@@ -7,15 +7,15 @@ from config import return_args, args
 from scipy.ndimage import gaussian_filter
 from torchvision import transforms
 from utils import setup_seed
-import nni
-from nni.utils import merge_parameter
 import util.misc as utils
 import torch
 import numpy as np
 import cv2
 import torch.nn as nn
+from torch_npu.contrib import transfer_to_npu
 from Networks.CDETR import build_model
 from tqdm import tqdm
+import copy
 img_transform = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 tensor_transform = transforms.ToTensor()
 
@@ -23,43 +23,20 @@ warnings.filterwarnings('ignore')
 '''fixed random seed '''
 setup_seed(args.seed)
 
-def resize_w_h(h, w):
-    max_size = 2048
-    min_size = 384
-    im_h, im_w = h, w
-    rate = 1.0 * max_size / im_h
-    rate_w = im_w * rate
-    if rate_w > max_size:
-        rate = 1.0 * max_size / im_w
-    tmp_h = int(1.0 * im_h * rate / 16) * 16
-
-    if tmp_h < min_size:
-        rate = 1.0 * min_size / im_h
-    tmp_w = int(1.0 * im_w * rate / 16) * 16
-
-    if tmp_w < min_size:
-        rate = 1.0 * min_size / im_w
-    tmp_h = min(max(int(1.0 * im_h * rate / 16) * 16, min_size), max_size)
-    tmp_w = min(max(int(1.0 * im_w * rate / 16) * 16, min_size), max_size)
-
-    rate_h = 1.0 * tmp_h / im_h
-    rate_w = 1.0 * tmp_w / im_w
-    assert tmp_h >= min_size and tmp_h <= max_size
-    assert tmp_w >= min_size and tmp_w <= max_size
-    return tmp_w, tmp_h
-
 
 def main(args):
-
+    # os.environ['ASCEND_RT_VISIBLE_DEVICES']="0"
     utils.init_distributed_mode(return_args)
     model, criterion, postprocessors = build_model(return_args)
     model = model.cuda()
-    torch.cuda.set_device(0)
-    model = nn.DataParallel(model, device_ids=[0])
+    args['local_rank'] = int(os.environ["LOCAL_RANK"])
+    model = nn.parallel.DistributedDataParallel(model, device_ids=[args['local_rank']])
+    # model = nn.DataParallel(model, device_ids=[0])
 
     if args['pre']:
         if os.path.isfile(args['pre']):
-            checkpoint = torch.load(args['pre'])['state_dict']
+            checkpoint = torch.load(args['pre'],
+                                    torch.device('cuda:0'))['state_dict']
             new_state_dict = OrderedDict()
             for k, v in checkpoint.items():
                 # if 'backbone' in k or 'transformer' in k:
@@ -69,8 +46,8 @@ def main(args):
                 new_state_dict[name] = v
 
             print("=> loading checkpoint '{}'".format(args['pre']))
-            checkpoint = torch.load(args['pre'])
-            model.load_state_dict(new_state_dict)
+            checkpoint = torch.load(args['pre'], torch.device('cuda:0'))
+            model.load_state_dict(new_state_dict, False)
             args['start_epoch'] = checkpoint['epoch']
             args['best_pred'] = checkpoint['best_prec1']
         else:
@@ -88,11 +65,15 @@ def main(args):
     # print(width, height)
     frames = cap.get(cv2.CAP_PROP_FRAME_COUNT)
     '''out video'''
-    # width = 1792
-    # height = 1024
-    width = 1024
-    height = 768
-    print(width, height)
+    new_height = 768
+    new_bg_height = 768
+    new_bg_width = 0
+    new_width = int(width * new_height / height)
+    if new_width % 256 == 0:
+        new_bg_width = copy.deepcopy(new_width)
+    else:
+        new_bg_width = (new_width // 256 + 1) * 256
+    bg = np.zeros((new_bg_height, new_bg_width, 3), dtype=np.uint8)
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     output_path_split = args['video_path'].split('/')[:-2]
     output_path = '/'.join(output_path_split) + f'/cltroutput/'
@@ -103,72 +84,82 @@ def main(args):
     output_path = output_path + output_name
     print(output_path)
     out = cv2.VideoWriter(f"{output_path}", fourcc, 30,
-                          (width , height))
+                          (new_width, new_height))
     history = []
-    with tqdm(total=frames,ncols=50) as pbar:
+    cnt = 0
+    step = 10
+    with tqdm(total=(frames // step), ncols=50) as pbar:
         while True:
-            try:
-                ret, frame = cap.read()
-                if not ret:
-                    break
-                frame = cv2.resize(frame, (width, height))
-            except:
-                print("test end")
-                cap.release()
+            ret, frame = cap.read()
+            if not ret:
                 break
-            frame = frame.copy()
-            ori_frame = frame.copy()
-            image = tensor_transform(frame)
-            image = img_transform(image)
+            if cnt % step == 0:
+                frame = cv2.resize(frame, (new_width, new_height))
+                bg[:new_height, :new_width] = frame
 
-            width, height = image.shape[2], image.shape[1]
-            num_w = int(width / 256)
-            num_h = int(height / 256)
-            image = image.view(3, num_h, 256,
-                               width).view(3, num_h, 256, num_w, 256)
-            image = image.permute(0, 1, 3, 2, 4).contiguous().view(
-                3, num_w * num_h, 256, 256).permute(1, 0, 2, 3)
+                frame = bg.copy()
+                # ori_frame = bg.copy()
+                image = tensor_transform(frame)
+                image = img_transform(image)
 
-            with torch.no_grad():
-                image = image.cuda()
-                outputs = model(image)
+                width, height = image.shape[2], image.shape[1]
+                num_w = int(width / 256)
+                num_h = int(height / 256)
+                image = image.view(3, num_h, 256,
+                                width).view(3, num_h, 256, num_w, 256)
+                image = image.permute(0, 1, 3, 2, 4).contiguous().view(
+                    3, num_w * num_h, 256, 256).permute(1, 0, 2, 3)
 
-                out_logits, out_point = outputs['pred_logits'], outputs[
-                    'pred_points']
+                with torch.no_grad():
+                    image = image.cuda()
+                    outputs = model(image)
 
-                prob = out_logits.sigmoid()
-                topk_values, topk_indexes = torch.topk(prob.view(
-                    out_logits.shape[0], -1),args['num_queries'],dim=1)
+                    out_logits, out_point = outputs['pred_logits'], outputs[
+                        'pred_points']
 
-                topk_points = topk_indexes // out_logits.shape[2]
-                out_point = torch.gather(
-                    out_point, 1,
-                    topk_points.unsqueeze(-1).repeat(1, 1, 2))
-                out_point = out_point * 256
+                    prob = out_logits.sigmoid()
+                    topk_values, topk_indexes = torch.topk(prob.view(
+                        out_logits.shape[0], -1),
+                                                        args['num_queries'],
+                                                        dim=1)
 
-                value_points = torch.cat([topk_values.unsqueeze(2), out_point],
-                                         2)
-                crop_size = 256
-                kpoint_map, density_map, frame, count = show_map(
-                    value_points, frame, width, height, crop_size, num_h,
-                    num_w)
+                    topk_points = topk_indexes // out_logits.shape[2]
+                    out_point = torch.gather(
+                        out_point, 1,
+                        topk_points.unsqueeze(-1).repeat(1, 1, 2))
+                    out_point = out_point * 256
 
-                # res1 = np.hstack((ori_frame, kpoint_map))
-                # res2 = np.hstack((density_map, frame))
-                # res = np.vstack((res1, res2))
-                res =cv2.addWeighted(frame, 0.6, density_map, 0.4, 0)
-                history.append(count)
-                if len(history) >= 50:
-                    history.pop(0)
-                history_mean = round(np.mean(history))
-                cv2.putText(res, f"Count:{history_mean}", (80, 80),
-                            cv2.FONT_HERSHEY_SIMPLEX, 3, (0, 0, 255), 5)
-                out.write(res)
-                # cv2.namedWindow('result', cv2.WINDOW_NORMAL)
-                # cv2.imshow('result', res)
-                # if cv2.waitKey(1) & 0xFF == ord('q'):
-                #     break
+                    value_points = torch.cat([topk_values.unsqueeze(2), out_point],
+                                            2)
+                    crop_size = 256
+                    kpoint_map, density_map, frame, count = show_map(
+                        value_points, frame, width, height, crop_size, num_h,
+                        num_w)
+
+                    # res1 = np.hstack((ori_frame, kpoint_map))
+                    # res2 = np.hstack((density_map, frame))
+                    # res = np.vstack((res1, res2))
+                    res = cv2.addWeighted(frame, 0.6, density_map, 0.4, 0)
+                    # history.append(count)
+                    # if len(history) >= 50:
+                    #     history.pop(0)
+                    # history_mean = round(np.mean(history))
+                    cv2.putText(
+                        res,
+                        f"Count:{count}",
+                        (80, 80),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        3,
+                        (0, 0, 255),
+                        5,
+                    )
+                    out.write(res[:new_height,:new_width])
+                    # cv2.namedWindow('result', cv2.WINDOW_NORMAL)
+                    # cv2.imshow('result', res)
+                    # if cv2.waitKey(1) & 0xFF == ord('q'):
+                    #     break
                 pbar.update(1)
+            cnt += 1
         # cv2.destroyAllWindows()
         cap.release()
         out.release()
@@ -221,8 +212,6 @@ def show_map(out_pointes, frame, width, height, crop_size, num_h, num_w):
 
 
 if __name__ == '__main__':
-    tuner_params = nni.get_next_parameter()
-
-    params = vars(merge_parameter(return_args, tuner_params))
+    params = vars(return_args)
 
     main(params)

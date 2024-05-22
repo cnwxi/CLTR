@@ -59,15 +59,11 @@ def main(args):
     # 构建模型
     model, criterion, postprocessors = build_model(return_args)
     # 分布式训练参数
-    os.environ['CUDA_VISIBLE_DEVICES'] = args['gpu_id']
+    os.environ['ASCEND_RT_VISIBLE_DEVICES'] = args['gpu_id']
     args['local_rank'] = int(os.environ["LOCAL_RANK"])
     if args['local_rank']==0:
         print(args)
     print("args['gpu_id']",args['gpu_id'])
-    # gpu_list=[int(i) for i in args['gpu_id'].split(',')]
-    # if args['local_rank'] not in gpu_list:
-    #     print('分配错误，重新匹配正确rank')
-    #     args['local_rank']+=gpu_list[0]
     
     torch.cuda.set_device(args['local_rank'])
     # 模型转移到GPU
@@ -81,7 +77,7 @@ def main(args):
             "%Y%m%d_%H%M", time.localtime(time.time()))
         args['save_path'] = path
         if (not os.path.exists(args['save_path'])) and args['local_rank'] == 0:
-            os.makedirs(args['save_path'])
+            os.makedirs(args['save_path'],exist_ok=True)
         if args['save']:
             logger = get_root_logger(path + '/1.log')
         else:

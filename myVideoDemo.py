@@ -88,14 +88,14 @@ def process_video(video_path, model,query_num,step=5):
         new_bg_width = (new_width // 256 + 1) * 256
     bg = np.zeros((new_bg_height, new_bg_width, 3), dtype=np.uint8)
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    output_path_split = video_path.split('/')[:-2]
-    output_path = '/'.join(output_path_split) + f'/cltroutput/'
+    output_path_split = video_path.split('/')[:-1]
+    output_path = '/'.join(output_path_split) + f'CLTROutputNWPU'
 
     if not os.path.exists(output_path):
         os.makedirs(output_path,exist_ok=True)
         print(f"mkdir output path:{output_path}")
     output_name = video_path.split('/')[-1].rsplit('.',1)[0] + '.mp4'
-    output_path = output_path + output_name
+    output_path = os.path.join(output_path , output_name)
     print(output_path)
     out = cv2.VideoWriter(f"{output_path}", fourcc, 30,
                           (new_width , new_height))
@@ -177,7 +177,7 @@ def main(args):
     # args['video_path'] = '/media/ubuntu/2.0TB/wxy/talkweb_data/data'
     # args['num_queries'] = 700
     # args['pre'] = 'video_model.pth'
-    step=10
+    step=2
     utils.init_distributed_mode(return_args)
     model, criterion, postprocessors = build_model(return_args)
     model = model.cuda()
